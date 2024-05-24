@@ -1,0 +1,6 @@
+---
+- hosts: dhcp
+  become: true
+  roles:
+    - common
+    - isc-dhcp-server

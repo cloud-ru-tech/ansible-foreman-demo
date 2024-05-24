@@ -1,0 +1,80 @@
+# READ: This file was written the foreman-installer and not by the Foreman
+# application. Any updates to subnets in the Foreman database are not
+# automatically reflected in this configuration and vice versa. Configuration
+# updates like DNS servers or adding/removing subnets must be done both in
+# Foreman application and in this configuration preferably via
+# foreman-installer. Use custom-hiera.yaml for multiple subnets.
+omapi-port 7911;
+
+default-lease-time 43200;
+max-lease-time 86400;
+
+
+not authoritative;
+
+
+ddns-update-style none;
+
+allow booting;
+allow bootp;
+
+option fqdn.no-client-update    on;  # set the "O" and "S" flag bits
+option fqdn.rcode2            255;
+option pxegrub code 150 = text ;
+
+
+
+
+# required for UEFI HTTP boot
+if substring(option vendor-class-identifier, 0, 10) = "HTTPClient" {
+  option vendor-class-identifier "HTTPClient";
+}
+# promote vendor in dhcpd.leases
+set vendor-string = option vendor-class-identifier;
+# next server and filename options
+next-server {{ ansible_default_ipv4.address }};
+option architecture code 93 = unsigned integer 16 ;
+
+#IPXE SUPPORT
+option space ipxe;
+option ipxe.tftp code 21 = unsigned integer 8;
+
+if exists user-class and option user-class = "iPXE" {
+    filename "http://{{ ansible_default_ipv4.address }}:8000/unattended/iPXE?bootstrap=1";  # Replace with actual FQDN of Foreman Server
+  } elsif option architecture = 00:06 {
+    filename "ipxe.efi";
+  } elsif option architecture = 00:07 {
+    filename "ipxe-snponly-x86-64.efi";
+  } elsif option architecture = 00:09 {
+    filename "ipxe.efi";
+  } else {
+    filename "undionly.kpxe";
+}
+
+log-facility local7;
+
+include "/etc/dhcp/dhcpd.hosts";
+#################################
+# class httpclients
+#################################
+class "httpclients" {
+  match if substring(option vendor-class-identifier, 0, 10) = "HTTPClient";
+  if option architecture = 00:0F {
+    filename "http://{{ ansible_default_ipv4.address }}:8000/EFI/grub2/shimia32.efi";
+  } else if option architecture = 00:10 {
+    filename "http://{{ ansible_default_ipv4.address }}:8000/EFI/grub2/shim.efi";
+  }
+  option vendor-class-identifier "HTTPClient";
+}
+
+#{{ dhcp_pool.subnet }}/24-default
+subnet {{ ansible_default_ipv4.network }} netmask {{ ansible_default_ipv4.netmask }} {
+  option subnet-mask {{ ansible_default_ipv4.netmask }};
+}
+#{{ dhcp_pool.subnet }}/24-pxe
+#subnet {{ dhcp_pool.subnet }} netmask {{ dhcp_pool.netmask }} {
+#    option routers {{ dhcp_pool.gw }};
+#    option domain-name-servers {{ dhcp_pool.dns }};
+#    range {{ dhcp_pool.start_dhcp }} {{ dhcp_pool.stop_dhcp }};
+#    next-server {{ ansible_default_ipv4.address }};
+#}

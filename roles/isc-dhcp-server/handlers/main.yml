@@ -1,0 +1,19 @@
+---
+- name: Restart isc-dhcp-server
+  ansible.builtin.systemd:
+    name: isc-dhcp-server
+    state: restarted
+    enabled: true
+    daemon-reload: true
+
+- name: Restart apache2
+  ansible.builtin.systemd:
+    name: apache2
+    state: restarted
+    enabled: true
+
+- name: Restart tftpd-hpa
+  ansible.builtin.systemd:
+    name: tftpd-hpa
+    state: restarted
+    enabled: true

@@ -1,0 +1,125 @@
+---
+- name: Install apache soft
+  ansible.builtin.apt:
+    name: "{{ item }}"
+    state: present
+    update_cache: true
+  loop:
+    - tftpd-hpa
+    - apache2
+    - pxelinux
+    - build-essential
+  notify:
+    - Restart apache2
+    - Restart tftpd-hpa
+
+- name: Ensure group "dhcpd" exists
+  ansible.builtin.group:
+    name: dhcpd
+    state: present
+
+- name: Add user dhcpd in group dhcpd
+  ansible.builtin.user:
+    name: dhcpd
+    groups: 'dhcpd'
+    state: present
+
+
+- name: Git https://github.com/isc-projects/dhcp.git checkout v4_4_3
+  ansible.builtin.git:
+    repo: 'https://github.com/isc-projects/dhcp.git'
+    dest: /root/dhcp
+    version: v4_4_3
+    force: true
+
+- name: Build dhcp.
+  ansible.builtin.shell: if [[ "`/usr/local/sbin/dhcpd --version 2>&1`" == "isc-dhcpd-4.4.3" ]]; \
+                        then echo "ok"; else cd /root/dhcp && ./configure --enable-paranoia && \
+                        make && make install; fi
+
+- name: Copy file dhcp
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: /{{ item }}
+    owner: root
+    group: root
+    mode: '0644'
+  loop:
+    - etc/default/isc-dhcp-server
+    - lib/systemd/system/isc-dhcp-server.service
+    - etc/dhcp/dhcpd.conf
+  notify:
+    - Restart isc-dhcp-server
+
+- name: Recursively make directory
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+    recurse: true
+  loop:
+    - /var/www/html/ks
+    - /var/www/html/images
+    - /srv/tftp/pxelinux.cfg
+
+- name: Copy file apache
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: /{{ item }}
+    owner: root
+    group: root
+    mode: '0644'
+  loop:
+    - etc/apache2/sites-available/ks-server.conf
+    - var/www/html/ks/meta-data
+    - var/www/html/ks/user-data
+    - srv/tftp/pxelinux.cfg/default
+    - srv/tftp/boot.msg
+  notify:
+    - Restart apache2
+
+- name: Download ubuntu-22.04.3-live-server-amd64.iso
+  ansible.builtin.get_url:
+    url: https://releases.ubuntu.com/22.04/ubuntu-22.04.3-live-server-amd64.iso
+    dest: /var/www/html/images/ubuntu-22.04.3-live-server-amd64.iso
+    mode: '0755'
+
+- name: Mount /var/www/html/imagesubuntu-22.04.3-live-server-amd64.iso
+  ansible.posix.mount:
+    path: /mnt/iso
+    src: /var/www/html/images/ubuntu-22.04.3-live-server-amd64.iso
+    fstype: iso9660
+    state: mounted
+
+- name: Copy file ubuntu live os
+  ansible.builtin.copy:
+    src: "/mnt/iso/casper/{{ item }}"
+    dest: "/srv/tftp/{{ item }}"
+    mode: '0644'
+    remote_src: true
+  loop:
+    - initrd
+    - vmlinuz
+
+- name: Unmount /var/www/html/imagesubuntu-22.04.3-live-server-amd64.iso
+  ansible.posix.mount:
+    path: /mnt/iso
+    src: /var/www/html/images/ubuntu-22.04.3-live-server-amd64.iso
+    fstype: iso9660
+    state: absent
+
+- name: Copy file pxelinux.0
+  ansible.builtin.copy:
+    src: /usr/lib/PXELINUX/pxelinux.0
+    dest: /srv/tftp/pxelinux.0
+    mode: '0644'
+    remote_src: true
+
+- name: Copy file ldlinux.c32
+  ansible.builtin.copy:
+    src: /usr/lib/syslinux/modules/bios/ldlinux.c32
+    dest: /srv/tftp/ldlinux.c32
+    mode: '0644'
+    remote_src: true

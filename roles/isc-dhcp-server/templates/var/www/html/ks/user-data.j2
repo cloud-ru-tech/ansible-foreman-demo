@@ -1,0 +1,22 @@
+#cloud-config
+autoinstall:
+  version: 1
+  identity:
+    hostname: ubuntu-demo
+    password: "$6$exDY1mhS4KUYCE/2$zmn9ToZwTKLhCw.b4/b.ZRTIZM30JZ4QrOQ2aOXJ8yk96xpcCof0kxKwuX1kqLG/ygbJ1f8wxED22bTL4F46P0" #ubuntu
+    username: ubuntu
+  storage:
+    layout:
+      name: lvm
+  ssh:
+    install-server: yes
+    allow-pw: yes
+  late-commands:
+    - echo "sleep 60"
+    - echo "rm /etc/cron.d/post-install"
+    - echo "lvextend -l +100%FREE /dev/mapper/ubuntu--vg-ubuntu--lv" > /target/root/post-install.sh
+    - echo "apt update && apt upgrade -y" >> /target/root/post-install.sh
+    - echo "reboot" >> /target/root/post-install.sh
+    - echo "SHELL=/bin/sh" > /target/etc/cron.d/post-install
+    - echo "PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin" >> /target/etc/cron.d/post-install
+    - echo "@reboot  root  /bin/bash /root/post-install.sh" >> /target/etc/cron.d/post-install

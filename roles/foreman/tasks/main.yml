@@ -1,0 +1,45 @@
+---
+- name: Set a hostname
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}"
+
+- name: Copy /etc/apt/sources.list.d/foreman.list and puppet.list
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: /{{ item }}
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - etc/apt/sources.list.d/foreman.list
+    - etc/apt/sources.list.d/puppet.list
+    - etc/hosts
+
+- name: Add an Apt signing key
+  ansible.builtin.apt_key:
+    url: "{{ item }}"
+    state: present
+  with_items:
+    - https://apt.puppetlabs.com/pubkey.gpg
+    - https://deb.theforeman.org/foreman.asc
+
+- name: Install software
+  ansible.builtin.apt:
+    name: "{{ item }}"
+    update_cache: true
+    state: present
+  loop:
+    - ca-certificates
+    - foreman-installer
+
+- name: Add locale en_US.UTF-8
+  community.general.locale_gen:
+    name: en_US.UTF-8
+    state: present
+#- name: Install foreman-master
+#  ansible.builtin.include_tasks: foreman-master.yml
+#  when: inventory_hostname in groups['foreman-master']
+
+#- name: Install foreman-proxy
+#  ansible.builtin.include_tasks: foreman-proxy.yml
+#  when: inventory_hostname in groups['foreman-proxy']

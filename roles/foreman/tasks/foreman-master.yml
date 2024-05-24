@@ -1,0 +1,17 @@
+---
+- name: Run foreman-install
+  ansible.builtin.command: foreman-installer --scenario foreman \
+          --foreman-initial-organization "cloud.ru" \
+          --foreman-initial-location "moscow" \
+          --foreman-initial-admin-username {{ foreman_user }} \
+          --foreman-initial-admin-password {{ foreman_pass }} \
+          --enable-foreman-plugin-discovery \
+          --enable-foreman-plugin-remote-execution \
+          --enable-foreman-plugin-ansible \
+          --enable-foreman-plugin-webhooks
+
+- name: Disable foreman-proxy master
+  ansible.builtin.systemd:
+    name: foreman-proxy
+    state: stopped
+    enabled: false

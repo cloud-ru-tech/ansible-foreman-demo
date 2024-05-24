@@ -1,0 +1,34 @@
+---
+all:
+  children:
+    dhcp:
+      hosts:
+        dhcp:
+          ansible_host: 192.168.1.11
+    foreman-master:
+      hosts:
+        foreman-master.cloud.ru:
+          ansible_host: 192.168.1.12
+    foreman-proxy:
+      hosts:
+        foreman-proxy-01.cloud.ru:
+          ansible_host: 192.168.1.13
+    foreman:
+      children:
+        foreman-master:
+        foreman-proxy:
+  vars:
+    ansible_user: admin
+    ansible_password: password
+    ansible_sudo_pass: password
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no \
+                              -o UserKnownHostsFile=/dev/null'
+    dhcp_pool:
+      subnet: 192.168.1.0
+      netmask: 255.255.255.0
+      gw: 192.168.1.1
+      dns: 1.1.1.1
+      start_dhcp: 192.168.1.155
+      stop_dhcp: 192.168.1.254
+    foreman_user: admin
+    foreman_pass: admin

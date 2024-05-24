@@ -1,0 +1,14 @@
+skip_list:  # or 'skip_list' to silence them completely
+  - command-instead-of-module  # Using command rather than module
+  - command-instead-of-shell  # Use shell only when shell functionality is required
+  - template-instead-of-copy  # Templated files should use template instead of copy
+  - experimental  # all rules tagged as experimental
+  - name[casing]  # Rule for checking task and play names.
+  - role-name[path] # rule that checks using paths when importing roles.
+warn_list:
+  - package-latest  # Package installs should not use latest.
+  - yaml[empty-values]  # Violations reported by yamllint.
+  - jinja[spacing]  # Rule that looks inside jinja2 templates.
+  - no-changed-when  # Commands should not change things if nothing needs doing.
+  - yaml[trailing-spaces]  # Violations reported by yamllint.
+  - no-handler  # Tasks that run when changed should likely be handlers.

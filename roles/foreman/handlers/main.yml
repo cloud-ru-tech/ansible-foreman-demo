@@ -1,0 +1,48 @@
+---
+
+- name: Restart foreman-proxy
+  ansible.builtin.systemd:
+    name: foreman-proxy
+    state: restarted
+    enabled: true
+    daemon-reload: true
+  notify:
+    - Connect foreman-proxy
+
+- name: Connect foreman-proxy
+  ansible.builtin.uri:
+    url: https://{{ groups['foreman-master'][0] }}/api/smart_proxies
+    user: "{{ foreman_user }}"
+    password: "{{ foreman_pass }}"
+    method: POST
+    body:
+      smart_proxy:
+        name: "{{ inventory_hostname }}"
+        url: "http://{{ inventory_hostname }}:8000"
+    headers:
+      Content-Type: application/json
+      Accept: version=2,application/json
+    force_basic_auth: true
+    status_code: [200, 201]
+    body_format: json
+    validate_certs: false
+
+- name: Restart vsftpd
+  ansible.builtin.systemd:
+    name: vsftpd
+    state: restarted
+    enabled: true
+
+- name: Restart isc-dhcp-server
+  ansible.builtin.systemd:
+    name: isc-dhcp-server
+    state: restarted
+    enabled: true
+    daemon-reload: true
+
+- name: Restart nginx
+  ansible.builtin.systemd:
+    name: nginx
+    state: restarted
+    enabled: true
+    daemon-reload: true

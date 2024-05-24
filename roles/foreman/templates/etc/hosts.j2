@@ -1,0 +1,4 @@
+127.0.0.1 localhost
+{% for host_name in groups['foreman'] %}
+{{ hostvars[host_name]['ansible_host'] }} {{ host_name}}
+{% endfor %}

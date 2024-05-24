@@ -1,0 +1,150 @@
+---
+- name: Copy file root
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: /{{ item }}
+    owner: root
+    group: root
+    mode: '0644'
+  loop:
+    - etc/default/isc-dhcp-server
+
+- name: Install foreman-proxy soft
+  ansible.builtin.apt:
+    name: "{{ item }}"
+    update_cache: true
+    state: present
+  with_items:
+    - vsftpd
+    - libpq-dev
+    - gcc
+    - make
+    - nginx
+
+- name: Remove default file nginx
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  with_items:
+    - /etc/nginx/sites-available/default
+    - /etc/nginx/sites-enabled/default
+
+- name: Run foreman-install proxy
+  ansible.builtin.command: foreman-installer \
+                              --no-enable-foreman \
+                              --no-enable-puppet \
+                              --no-enable-foreman-plugin-puppet \
+                              --no-enable-foreman-cli-puppet \
+                              --foreman-proxy-puppetca=false \
+                              --foreman-proxy-puppet=false \
+                              --enable-foreman-proxy-plugin-shellhooks \
+                              --enable-foreman-proxy \
+                              --foreman-proxy-registration=false \
+                              --foreman-proxy-ssl=false \
+                              --foreman-proxy-http=true \
+                              --foreman-proxy-trusted-hosts={{ groups['foreman-master'][0] }} \
+                              --foreman-proxy-foreman-base-url="https://{{ groups['foreman-master'][0] }}"
+                              --foreman-proxy-register-in-foreman=false \
+                              --foreman-proxy-dhcp=true \
+                              --foreman-proxy-dhcp-listen-on=http \
+                              --foreman-proxy-tftp=true \
+                              --foreman-proxy-tftp-listen-on=http \
+                              --foreman-proxy-logs-listen-on=http \
+                              --foreman-proxy-templates=true \
+                              --foreman-proxy-template-url="http://{{ ansible_host }}:8000" \
+                              --foreman-proxy-httpboot=true
+
+- name: Git https://github.com/isc-projects/dhcp.git checkout v4_4_3
+  ansible.builtin.git:
+    repo: 'https://github.com/isc-projects/dhcp.git'
+    dest: /root/dhcp
+    version: v4_4_3
+    force: true
+
+- name: Build dhcp
+  ansible.builtin.shell: if [[ "`/usr/local/sbin/dhcpd --version 2>&1`" == "isc-dhcpd-4.4.3" ]]; \
+                        then echo "ok"; else cd /root/dhcp && ./configure --enable-paranoia && \
+                        make && make install; fi
+
+- name: Copy file foreman-proxy
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: /{{ item }}
+    owner: root
+    group: root
+    mode: '0644'
+  with_items:
+    - etc/ftpusers
+    - etc/vsftpd.user_list
+    - etc/vsftpd.conf
+    - lib/systemd/system/foreman-proxy.service
+    - lib/systemd/system/isc-dhcp-server.service
+    - etc/dhcp/dhcpd.conf
+    - etc/nginx/sites-available/foreman
+  notify:
+    - Restart vsftpd
+    - Restart foreman-proxy
+    - Restart isc-dhcp-server
+    - Restart nginx
+
+- name: Create a symbolic link nginx site-enable
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/foreman
+    dest: /etc/nginx/sites-enabled/foreman
+    owner: root
+    group: root
+    state: link
+  notify:
+    - Restart nginx
+
+- name: Copy file with owner and permissions
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: /{{ item }}
+    owner: root
+    group: root
+    mode: '0644'
+  with_items:
+    - srv/tftp/pxelinux.1
+    - srv/tftp/ipxe.efi
+    - srv/tftp/snponly.efi
+    - srv/tftp/undionly.kpxe
+    - srv/tftp/ipxe-snponly-x86-64.efi
+    - srv/tftp/ipxe.lkrn
+    - srv/tftp/startnet.cmd
+
+- name: Download ubuntu-20.04.6-live-server-amd64.iso
+  ansible.builtin.get_url:
+    url: https://releases.ubuntu.com/20.04/ubuntu-20.04.6-live-server-amd64.iso
+    dest: /srv/tftp/ubuntu-20.04.6-live-server-amd64.iso
+    mode: '0755'
+
+- name: Creates dir ubuntu-20.04.6-live-server-amd64
+  ansible.builtin.file:
+    path: /srv/tftp/ubuntu-20.04.6-live-server-amd64
+    state: directory
+    owner: root
+    group: root
+    mode: 0644
+
+
+- name: Mount ubuntu-20.04.6-live-server-amd64
+  ansible.posix.mount:
+    path: /mnt/iso
+    src: /srv/tftp/ubuntu-20.04.6-live-server-amd64.iso
+    fstype: iso9660
+    state: mounted
+
+- name: Unarchive ubuntu-20.04.6-live-server-amd64
+  ansible.builtin.shell: cp -r /mnt/iso/casper /srv/tftp/ubuntu-20.04.6-live-server-amd64/casper && \
+                        chmod -R 777 /srv/tftp/ubuntu-20.04.6-live-server-amd64 && \
+                        umount /mnt/iso
+  changed_when: false
+
+- name: Chmod 777 /srv/tftp
+  ansible.builtin.file:
+    path: '/srv/tftp'
+    state: directory
+    owner: root
+    group: root
+    mode: 0777

@@ -1,0 +1,16 @@
+display boot.msg
+ontimeout ubuntu-live-install-autoinstall
+default 1
+prompt 0
+
+label 1
+  menu label ^Install Ubuntu 22.04.3
+  kernel vmlinuz
+  initrd initrd
+  append url=http://{{ ansible_default_ipv4.address }}/images/ubuntu-22.04.3-live-server-amd64.iso autoinstall ds=nocloud-net;s=http://{{ ansible_default_ipv4.address }}/ks/ cloud-config-url=/dev/null ip=dhcp fsck.mode=skip ---
+
+label 2
+  menu label Boot from ^local drive
+  localboot 0x80
+
+menu end

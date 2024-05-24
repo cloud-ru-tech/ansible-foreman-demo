@@ -1,0 +1,10 @@
+server {
+    listen 80;
+    server_name {{ ansible_host }};
+    access_log  /var/log/nginx/foreman.http.access.log ;
+    error_log  /var/log/nginx/foreman.http.error.log ;
+    client_max_body_size 1G;
+    location / {
+    proxy_pass https://{{ groups['foreman-master'][0] }} ;
+    }
+}

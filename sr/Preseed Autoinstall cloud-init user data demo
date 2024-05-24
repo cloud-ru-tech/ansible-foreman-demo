@@ -1,0 +1,67 @@
+<%#
+kind: user_data
+name: Preseed Autoinstall cloud-init user data demo
+model: ProvisioningTemplate
+oses:
+- Ubuntu
+test_on:
+- ubuntu_autoinst4dhcp
+description: |
+  The provisioning template for Autoinstall based distributions. To customize the installation,
+  modify the host parameters
+
+  This template accepts the following parameters:
+  - lang: string (default="en_US.UTF-8")
+  - keyboard: string (default="us")
+  - package_upgrade: boolean (default=false)
+  - remote_execution_ssh_keys: string (default="")
+  - username_to_create: string (default="root")
+  - realname_to_create: string (default=username_to_create)
+  - password_to_create: string (default=@host.root_pass)
+-%>
+<%-
+username_to_create = host_param('username_to_create', 'root')
+realname_to_create = host_param('realname_to_create') || username_to_create
+password_to_create = host_param('password_to_create') || @host.root_pass
+enable_auto_update = (host_param_true?('package_upgrade') && !host_param('kt_activation_keys'))
+-%>
+#cloud-config
+autoinstall:
+  version: 1
+  apt:
+    geoip: false
+    preserve_sources_list: false
+    primary:
+      - arches: [amd64, i386]
+        uri: http://archive.ubuntu.com/ubuntu
+      - arches: [default]
+        uri: http://ports.ubuntu.com/ubuntu-ports
+<% unless enable_auto_update -%>
+    disable_components: [multiverse]
+    disable_suites: [backports,security,updates] 
+<% end -%>
+<%= indent(4) { snippet_if_exists(template_name + " custom apt") } -%>
+  user-data:
+    disable_root: false
+    fqdn: <%= @host.name %>
+    users:
+    - name: <%= username_to_create %>
+      gecos: <%= realname_to_create %>
+      lock-passwd: false
+      hashed_passwd: <%= password_to_create %>
+  keyboard:
+    layout: <%= host_param('keyboard', 'us') %>
+    toggle: null
+    variant: ''
+  locale: <%= host_param('lang', 'en_US') %>.UTF-8
+<%= snippet 'preseed_netplan_setup_demo' -%>
+  ssh:
+    allow-pw: true
+    install-server: true
+  updates: security
+<%= indent(2) { @host.diskLayout } -%>
+<%= indent(2) { snippet_if_exists(template_name + " custom root") } -%>
+  late-commands:
+  - wget -Y off <%= @static ? "'#{foreman_url('finish', static: 'true')}'" : foreman_url('finish') %> -O /target/tmp/finish.sh
+  - curtin in-target -- chmod +x /tmp/finish.sh
+  - curtin in-target -- /tmp/finish.sh

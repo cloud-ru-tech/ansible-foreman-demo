@@ -1,0 +1,39 @@
+#!gpxe
+<%#
+kind: iPXE
+name: Preseed default iPXE Autoinstall demo
+model: ProvisioningTemplate
+oses:
+- ubuntu
+test_on:
+- ubuntu_autoinst4dhcp
+-%>
+#
+# This file was deployed via '<%= template_name %>' template
+#
+# Supported host/hostgroup parameters:
+#
+# blacklist = module1, module2
+#   Blacklisted kernel modules
+#
+# lang = en_US
+#   System locale
+#
+# WARNING
+#
+# Foreman will not download the kernel/initramdisk to PXE automatically. Please follow
+# the official Ubuntu documentation and extract the files from the LiveCD (DVD) manually
+# and optionally update the KERNEL and INITRD lines in this template.
+#
+
+<% boot_files_uris = @host.operatingsystem.boot_files_uri(medium_provider) -%>
+<% kernel = boot_files_uris[0] -%>
+<% initrd = boot_files_uris[1] -%>
+
+kernel <%= kernel %> initrd=initrd root=/dev/rd/0 rw auto <%= snippet('preseed_kernel_options_autoinstall_demo').strip %>
+
+initrd <%= initrd %>
+
+imgstat
+sleep 2
+boot
